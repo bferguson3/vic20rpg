@@ -1,5 +1,14 @@
 .label init=$120e
-.label DrawHero=$1c11
-.label testString=$1229
-.label PrintText=$1c03
+.label mapOffset=$126e
+.label DrawMap=$1274
+.label PrintText=$123b
 .label basicEnd=$120c
+.label DrawHero=$1249
+.label mapdrawOffset=$1270
+.label maphelper2=$1273
+.label CheckInput=$2600
+.label DrawTile_AXY=$12df
+.label TileMap=$1c06
+.label testString=$1226
+.label maphelper1=$1272
+.label ColorChart=$1c00
