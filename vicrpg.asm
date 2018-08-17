@@ -16,7 +16,6 @@
 
 /////////////////////////////////////
 
-
 //; Expanded VIC-20 kickstart
 *=$1201 "Code block 1"
     .word basicEnd
@@ -50,7 +49,6 @@
     playerY: .byte $05
     testString: .text "Test"
 
-//*=$1238 "Code block 2"
     !loop:   
         jsr CheckInput
         jmp !loop-
@@ -121,9 +119,7 @@ DrawMap:
         cpx #drawWidth //drawWidth
         bcs !yloop+
         lda mapdrawOffset+1
-        //lda #>TileMap
         sta $fe
-        //lda #<TileMap
         lda mapdrawOffset
         sta $fd
         lda ($fd),y
@@ -138,13 +134,13 @@ DrawMap:
         !yloop: 
         inc maphelper2
         ldx maphelper2
-        cpx #drawHeight //drawHeight //its broken here somewhere
+        cpx #drawHeight 
         bcs !end+
         //new row...
         ldx #0
         stx maphelper1
         .eval var widthsize = mapWidth-(drawWidth)
-        lda #widthsize //mapWidth - drawWidth
+        lda #widthsize 
         clc
         adc mapdrawOffset
         bcc !next+
@@ -190,12 +186,10 @@ DrawTile_AXY:
     !skipmath:
     //get color, store in fb
     lda $fe //A input
-    
     //If loading tile numbers directly:
     //tax
     //dex
     //
-    
     //If loading charpad tile nums:
     sec
     sbc #96 
@@ -211,7 +205,6 @@ DrawTile_AXY:
     //clc
     //adc #95
     //
-
     //loading charpad tile nums?
     txa
     clc
@@ -266,7 +259,7 @@ CheckInput:
         bcc !+
         cmp #251+1
         bcs !+
-        //'2' pressed - right
+        //'A' pressed - right
         lda playerX
         .eval var mapsizer = mapWidth-(drawWidth+1)+6
         cmp #mapsizer
@@ -284,7 +277,7 @@ CheckInput:
         bcc !+
         cmp #253+1
         bcs !+
-        //'4' pressed
+        //'D' pressed
         lda playerX
         cmp #6
         bcc !end+
@@ -301,7 +294,7 @@ CheckInput:
         bcc !+
         cmp #253+1
         bcs !+
-        //'6' pressed
+        //'S' pressed
         lda playerY
         cmp #mapHeight-6
         bcs !+
@@ -323,10 +316,7 @@ CheckInput:
         bcc !+
         cmp #253+1
         bcs !+
-        //lda mapOffset+1
-        //cmp #1
-        //bcc !+
-        //'8' pressed
+        //'W' pressed
         lda playerY
         cmp #6
         bcc !end+
