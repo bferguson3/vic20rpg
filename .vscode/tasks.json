@@ -6,7 +6,7 @@
         {
             "label": "Compile VIC-20",
             "type": "shell",
-            "command": "java -jar kickass.jar vicrpg.asm"
+            "command": "java -jar kickass.jar ${file}"
         },
         {
             "label": "Run VIC-20",

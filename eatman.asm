@@ -1,5 +1,8 @@
+//; DragonHoard
+//;  (c)2018 Ben Ferguson
 //; UN-Expanded VIC-20 kickstart
 *=$1001 "Code block 1"
+block1start:
     .word basicEnd
     .word 2013
     .byte $9e
@@ -32,10 +35,12 @@ init:
 //Variable declaration block:
 
 playerX: .byte $0a
-playerY: .byte $13
+playerY: .byte $10
 frameCounter: .byte $00
 playerDirection: .byte $00 //2 up, 4 right, 6 down, 8 left, 0 = not moving
-playerAnimationFrame: .byte $00
+//playerAnimationFrame: .byte $00
+
+randNo: .byte $00,$00
 
 !loop:
     //FrameCounter routine:
@@ -49,27 +54,35 @@ playerAnimationFrame: .byte $00
     
     inc frameCounter
     lda frameCounter
-    and #%00000111 //=7
+    and #%00000011 
     bne !loop-
-    jmp !frame8+
+    jmp !frame4+
     
     !notzero:
+    inc randNo
+    bne !loop-
+    inc randNo+1
     jmp !loop-
+    //jmp !loop-
     
+    !frame4:
+    jsr FlashPow
+    lda frameCounter
+    and #%00000111
+    bne !loop-
+
     !frame8:
-    
-    lda playerAnimationFrame
-    cmp #1
-    bcc !+
-    lda #0
-    sta playerAnimationFrame
-    jmp !go+
-    !:inc playerAnimationFrame
-    !go:
-    
     jsr CheckInput
     jsr FindNewPlayerPos //do collision here
     jsr DrawPlayer
+    jsr IncreaseScore
+    lda frameCounter
+    and #%00001111
+    bne !loop-
+
+    !frame16:
+    jsr FindNewEnemyPos
+    jsr MoveEnemies //jmp DrawEnemies
     jmp !loop-
 
 .const eatManLeft = 71
@@ -87,6 +100,88 @@ ClearPlayerPos:
         lda #0
         jsr DrawCharacter_XYA 
     rts
+
+moveLoop: .byte $fc 
+
+MoveEnemies:
+        //replace char first
+        
+  en1a: ldx enemyx 
+  en1b: ldy enemyy 
+  en1c: lda enemychar
+        jsr DrawCharacter_XYA
+  en2a: ldx enemyx 
+  en2b: ldy enemyy 
+  en2c: lda enemychar
+        jsr ColorCharacter_XYA
+        ldx enemyx+1 
+        ldy enemyy+1 
+        lda enemychar+1
+        jsr DrawCharacter_XYA
+        ldx enemyx+1 
+        ldy enemyy+1 
+        lda enemychar+1
+        jsr ColorCharacter_XYA
+        ldx enemyx+2 
+        ldy enemyy+2 
+        lda enemychar+2
+        jsr DrawCharacter_XYA
+        ldx enemyx+2 
+        ldy enemyy+2 
+        lda enemychar+2
+        jsr ColorCharacter_XYA
+        ldx enemyx+3
+        ldy enemyy+3 
+        lda enemychar+3
+        jsr DrawCharacter_XYA
+        ldx enemyx+3 
+        ldy enemyy+3 
+        lda enemychar+3
+        jsr ColorCharacter_XYA
+        
+        //now acually move:
+
+        lda enemydir
+        cmp #3
+        bcs !more+
+        //up
+        ldx enemyy
+        dex 
+        stx enemyy 
+        //draw enemy
+        jmp !end+ //?
+        !more:
+        cmp #5
+        bcs !more+
+        //right
+        ldx enemyx
+        inx 
+        stx enemyx 
+        //draw?
+        jmp !end+
+        !more:
+        cmp #7
+        bcs !more+
+        //down
+        ldx enemyy
+        inx 
+        stx enemyy
+        //draw?
+        jmp !end+
+        !more:
+        //left
+        ldx enemyx
+        dex 
+        stx enemyx
+        //draw?
+        //rts  //?
+        !end:
+    jmp MoveEnemies234
+    //jmp DrawEnemies
+
+
+        !quickReturn:
+    rts 
 
 FindNewPlayerPos:
         //check if playerX = 0 and direction=8 then wrap x=22
@@ -121,7 +216,7 @@ FindNewPlayerPos:
         bcc !+
         ldx playerX
         ldy playerY
-        cpy #23
+        cpy #20
         bcs wrapUp
         iny
         jsr CheckCollider_XY
@@ -171,7 +266,7 @@ FindNewPlayerPos:
          rts
         wrapDown:
         jsr ClearPlayerPos
-        ldy #22
+        ldy #20
         sty playerY
          rts
     !:  cmp #1
@@ -253,6 +348,10 @@ CheckInput:
 
 drawChar: .byte $00
 
+/////////////////
+// x position
+// y position
+// returns A = 0 if empty, 1 if blocked
 CheckCollider_XY:
         stx $fd
         sty $fe
@@ -285,16 +384,9 @@ CheckCollider_XY:
         lda ($fb),y
         cmp #83
         bcc !+
-        cmp #84+1
+        cmp #92+1
         bcs !+
         //
-        lda #1
-        rts
-        !:
-        cmp #85
-        bcc !+
-        cmp #85+1
-        bcs !+ //missing before:
         lda #1
         rts
     !:  //between 77-80 = edges
@@ -305,17 +397,27 @@ CheckCollider_XY:
         lda #1
         rts
     !:  
+        cmp #90
+        bcc !+
+        cmp #92+1
+        bcs !+
+        lda #1
+        rts 
+        !:
+        
         lda #0
         rts
 
-DrawCharacter_XYA:
+
+
+LoadCharacter_XYA:
         stx $fd
         sty $fe
-        sta drawChar
+        sta drawChar //86-89
 
-        lda #0
+        lda #0//screenmem lb
         sta $fb
-        lda #$1e
+        lda #$1e //screenmem hb
         sta $fc
         lda #0
         ldy $fe
@@ -337,7 +439,107 @@ DrawCharacter_XYA:
         !noinc:
         sta $fb
         //draw:
+        ldy #0
         lda drawChar
+        cmp #87 //enemy 1
+        bcs !more+
+        //Load char into enemy char
+        lda ($fb),y 
+        sta enemychar
+        jmp !end+
+        !more:
+        cmp #88
+        bcs !more+
+        lda ($fb),y
+        sta enemychar+1
+        jmp !end+
+        !more:
+        cmp #89
+        bcs !more+
+        lda ($fb),y 
+        sta enemychar+2
+        jmp !end+
+        !more:
+        lda ($fb),y 
+        sta enemychar+3
+        //ldy #0
+        //sta ($fb),y
+        !end:
+rts
+///////////////////
+// x: x position on-screen
+// y: y position on-screen
+// A: character # to draw
+DrawCharacter_XYA:
+        stx $fd
+        sty $fe
+        sta drawChar
+
+        lda #0//screenmem lb
+        sta $fb
+        lda #$1e //screenmem hb
+        sta $fc
+        lda #0
+        ldy $fe
+    !:  beq !yzero+
+        clc
+        adc #22
+        bcc !noinc+
+        inc $fc
+        !noinc:
+        dey
+        bpl !-
+    !yzero:
+        ldx $fd
+        stx $fb
+        clc
+        adc $fb
+        bcc !noinc+
+        inc $fc
+        !noinc:
+        sta $fb
+        //Draw:
+        lda drawChar
+        ldy #0
+        sta ($fb),y
+        
+rts
+
+///////////////////
+// x: x position on-screen
+// y: y position on-screen
+// A: character # to draw
+ColorCharacter_XYA:
+        stx $fd
+        sty $fe
+        sta drawChar
+
+        lda #0//screenmem lb
+        sta $fb
+        lda #$96 //colormem hb
+        sta $fc
+        lda #0
+        ldy $fe
+    !:  beq !yzero+
+        clc
+        adc #22
+        bcc !noinc+
+        inc $fc
+        !noinc:
+        dey
+        bpl !-
+    !yzero:
+        ldx $fd
+        stx $fb
+        clc
+        adc $fb
+        bcc !noinc+
+        inc $fc
+        !noinc:
+        sta $fb
+        //Color:
+        ldx drawChar
+        lda ColorData,x
         ldy #0
         sta ($fb),y
         
@@ -372,8 +574,8 @@ DrawPlayer:
         sta $fb
         //actually draw
         //check playerAnimationFrame
-        lda playerAnimationFrame
-        beq !drawCircle+
+        //lda playerAnimationFrame
+        //beq !drawCircle+
         //
         lda playerDirection
         cmp #8
@@ -393,8 +595,8 @@ DrawPlayer:
         !next:
         lda #eatManUp
         jmp !+
-        !drawCircle:
-        lda #eatMan
+        //!drawCircle:
+        //lda #eatMan
         !:
         ldy #0
         sta ($fb),y
@@ -403,7 +605,7 @@ DrawPlayer:
         clc
         adc $fc
         sta $fc
-        lda #7
+        lda #5
         sta ($fb),y
     rts
 
@@ -425,9 +627,691 @@ DrawLevel:
         bne !-
     rts
 
-*=$1400
+IncreaseScore:
+        // subtract 48 to get the actual value of the digit
+        // increase 1, if its =A then roll up next digit and set
+        // this digit to zero.
+        lda #<screenMem+((22*21)+14) //location of score lsd
+        sta $fb 
+        lda #>screenMem+((22*21)+14)
+        sta $fc 
+        //14,21
+        ldy #0
+        lda ($fb),y
+
+        clc 
+        adc #1
+        sta ($fb),y 
+        cmp #58
+        bcc !skip+
+        !rolloverloop:
+        lda #48
+        sta ($fb),y
+        dec $fb     //next most sig digit
+        lda ($fb),y 
+        clc 
+        adc #1
+        sta ($fb),y
+        cmp #58
+        bcs !rolloverloop-
+        !skip:
+    rts
+/*
+//from motorola 6800 by don aldridge
+.var htd_out = $fb
+.var htd_in = $fd
+HexToDeci_A:
+    cld 
+    sta htd_in 
+    tay 
+    lda #0
+    sta htd_out
+    sta htd_out+1
+*/
+block1end:
+.print "Code block 1 size: " + (block1end-block1start)
+*=$1400 "Chars, map, colors"
+datastart:
     .import binary "eatmanchars.raw"
 LevelData:
     .import binary "eatmanmap.bin"
 ColorData:
     .import binary "eatmancolors.raw"
+dataend:
+.print "Data block size: " + (dataend-datastart)
+*=$195a "Code block 2"
+
+enemyx: .byte $09,$0a,$0b,$0c
+enemyy: .byte $09,$09,$09,$09
+enemydir: .byte $08,$08,$04,$04
+
+
+DrawEnemies:
+        //replace char first
+
+        ldx enemyx 
+        ldy enemyy 
+        lda #86
+        jsr LoadCharacter_XYA //loads into ram char at new pos
+        ldx enemyx 
+        ldy enemyy 
+        lda #86
+        jsr DrawCharacter_XYA //draws enemy at new pos
+        ldx enemyx 
+        ldy enemyy 
+        lda #86
+        jsr ColorCharacter_XYA //colors char at new pos
+        ldx enemyx+1 
+        ldy enemyy+1 
+        lda #86+1
+        jsr LoadCharacter_XYA //loads into ram char at new pos
+        ldx enemyx+1 
+        ldy enemyy+1 
+        lda #86+1
+        jsr DrawCharacter_XYA //draws enemy at new pos
+        ldx enemyx+1 
+        ldy enemyy+1 
+        lda #86+1
+        jsr ColorCharacter_XYA //colors char at new pos
+        ldx enemyx+2 
+        ldy enemyy+2 
+        lda #86+2
+        jsr LoadCharacter_XYA //loads into ram char at new pos
+        ldx enemyx+2 
+        ldy enemyy+2 
+        lda #86+2
+        jsr DrawCharacter_XYA //draws enemy at new pos
+        ldx enemyx+2 
+        ldy enemyy+2 
+        lda #86+2
+        jsr ColorCharacter_XYA //colors char at new pos
+        ldx enemyx+3
+        ldy enemyy+3 
+        lda #86+3
+        jsr LoadCharacter_XYA //loads into ram char at new pos
+        ldx enemyx+3 
+        ldy enemyy+3 
+        lda #86+3
+        jsr DrawCharacter_XYA //draws enemy at new pos
+        ldx enemyx+3 
+        ldy enemyy+3 
+        lda #86+3
+        jsr ColorCharacter_XYA //colors char at new pos
+rts
+
+MoveEnemies234:
+        lda enemydir+1
+        cmp #3
+        bcs !more+
+        //up
+        ldx enemyy+1
+        dex 
+        stx enemyy+1 
+        //draw enemy
+        jmp !end+ //?
+        !more:
+        cmp #5
+        bcs !more+
+        //right
+        ldx enemyx+1
+        inx 
+        stx enemyx+1 
+        //draw?
+        jmp !end+
+        !more:
+        cmp #7
+        bcs !more+
+        //down
+        ldx enemyy+1
+        inx 
+        stx enemyy+1
+        //draw?
+        jmp !end+
+        !more:
+        //left
+        ldx enemyx+1
+        dex 
+        stx enemyx+1
+        //draw?
+        //rts  //?
+        !end:
+
+        lda enemydir+2
+        cmp #3
+        bcs !more+
+        //up
+        ldx enemyy+2
+        dex 
+        stx enemyy+2 
+        //draw enemy
+        jmp !end+ //?
+        !more:
+        cmp #5
+        bcs !more+
+        //right
+        ldx enemyx+2
+        inx 
+        stx enemyx+2 
+        //draw?
+        jmp !end+
+        !more:
+        cmp #7
+        bcs !more+
+        //down
+        ldx enemyy+2
+        inx 
+        stx enemyy+2
+        //draw?
+        jmp !end+
+        !more:
+        //left
+        ldx enemyx+2
+        dex 
+        stx enemyx+2
+        //draw?
+        //rts  //?
+        !end:
+
+        lda enemydir+3
+        cmp #3
+        bcs !more+
+        //up
+        ldx enemyy+3
+        dex 
+        stx enemyy+3 
+        //draw enemy
+        jmp !end+ //?
+        !more:
+        cmp #5
+        bcs !more+
+        //right
+        ldx enemyx+3
+        inx 
+        stx enemyx+3 
+        //draw?
+        jmp !end+
+        !more:
+        cmp #7
+        bcs !more+
+        //down
+        ldx enemyy+3
+        inx 
+        stx enemyy+3
+        //draw?
+        jmp !end+
+        !more:
+        //left
+        ldx enemyx+3
+        dex 
+        stx enemyx+3
+        //draw?
+        //rts  //?
+        !end:
+    jmp DrawEnemies
+
+enemyposloop: .byte $00
+
+Rand2468:
+        !:
+        lda randNo
+        and #%00001110
+        cmp #9
+        bcc !+
+        asl randNo
+        jmp !-
+        !:
+    rts
+RandAndLoop:
+        jsr Rand2468
+        ldx enemyposloop
+        sta enemydir,x 
+        jmp newposloop
+
+FindNewEnemyPos:
+        //zp: $fb $fc $fd $fe 
+        //using CheckCollider_XY clobs all zp
+        ldx #0
+        stx enemyposloop
+    newposloop:
+        ldx enemyposloop
+        lda enemydir,x //2, 4, 6, 8
+        cmp #3
+        bcs !more+
+        //UP:::::
+        //2/up OR 6/down
+        // check left/right tiles for collision
+        // if empty, change direction randomly
+        // check random direction for collision
+        // repeat if needed
+        // end sub
+        // else
+        // check forward tile for collision
+        // end sub
+        // else
+        // dir = backwards
+        // end sub
+        !checkright: //>>checkleft
+        lda enemyy,x 
+        tay 
+        lda enemyx,x 
+        tax 
+        inx //one tile right
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcs !checkleft+
+        // empty
+        jmp RandAndLoop
+        
+        !checkleft:
+        ldx enemyposloop
+        lda enemyy,x 
+        tay 
+        lda enemyx,x 
+        tax 
+        dex //one tile left
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcs !checkoneup+
+        //1 left is empty
+        jmp RandAndLoop
+        //RIGHT:::
+        !more:
+        cmp #5
+        bcs !more+
+        //4 - right
+        !checkup:
+        ldx enemyposloop
+        lda enemyy,x 
+        tay 
+        dey 
+        lda enemyx,x 
+        tax 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcs !checkdown+
+        jmp RandAndLoop
+        !checkdown:
+
+        !more:
+        !checkoneup:
+        !checkoneleft:
+        !checkoneright:
+        !checkonedown:
+endNMECollision:
+        inc enemyposloop
+        lda enemyposloop
+        cmp #4
+        bcs !+
+        jmp newposloop
+        !:
+        lda #0
+        sta enemyposloop
+    rts 
+        // 4/right OR 8/left
+        // check up/down for collision
+        // if empty, change dir random
+        // check new dir for collision
+        // repeat if needed
+        // end sub
+        // else
+        // check forward tile for collision
+        // end sub
+        // else
+        // dir = backwards
+        // end sub
+        /*
+        ldx #0
+        stx enemyposloop // loop number
+nmeColLoop:
+        ldx enemyposloop
+        lda enemydir,x //has enemy dir
+        // check lateral from dir
+        cmp #3
+        bcs !more+
+        //up: check x+1 and x-1
+        lda enemyy,x
+        tay 
+        lda enemyx,x
+        tax 
+        inx //x=x+1, y=y
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcs !checkleft+
+        //unblocked on right
+        //INSTEAD:
+        //roll random: 2, 4, 6, or 8
+        //store in dir and jmp back to nmecolloop
+        // need: 0010 0100 0110 1000
+        //not need: 1110 1010 
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        //lda #4 
+        //ldx enemyposloop
+        //sta enemydir,x //change dir to RIGHT
+        jmp endNMECollision //?
+        !checkleft:
+        ldx enemyposloop
+        lda enemyy,x 
+        tay 
+        lda enemyx,x 
+        tax 
+        dex 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcc !+//checkfrontback+
+        jmp checkfrontback
+        !:
+        //unblocked on left
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+        
+        !more: //dir = 4 next
+        cmp #5
+        bcs !more+
+        //right- check up and down
+        lda enemyy,x 
+        tay 
+        iny 
+        lda enemyx,x 
+        tax 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcs !checkup+
+        //unblocked DOWN, change dir
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+        !checkup:
+        ldx enemyposloop
+        lda enemyy,x 
+        tay 
+        dey 
+        lda enemyx,x 
+        tax 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcc !+//checkfrontback+
+        jmp checkfrontback
+        !:
+        //unblocked UP
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+        !more: //6
+        cmp #7
+        bcs !more+
+        //down - check r:
+        lda enemyy,x 
+        tay 
+        lda enemyx,x 
+        tax 
+        inx 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcs !checkleft+
+        //unblocked right, change dir
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+        !checkleft:
+        ldx enemyposloop
+        lda enemyy,x 
+        tay 
+        lda enemyx,x 
+        tax 
+        dex 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcc !+//checkfrontback+
+        jmp checkfrontback
+        !:
+        //unblocked l
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+        
+        !more: //left: 8
+        //check up and down
+        lda enemyy,x 
+        tay 
+        iny 
+        lda enemyx,x 
+        tax 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcs !checkup+
+        //unblocked down
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+        !checkup:
+        ldx enemyposloop
+        lda enemyy,x 
+        tay 
+        dey 
+        lda enemyx,x 
+        tax 
+        jsr CheckEnemyCollider_XY
+        cmp #1
+        bcc !+
+        jmp checkfrontback
+        !:
+        //unblocked up
+        lda randNo
+        and #%01110000
+        lsr 
+        lsr 
+        lsr // xxxx111x
+        cmp #9
+        bcc !+
+        jmp checkfrontback
+        !:
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+checkfrontback:
+        ldx enemyposloop
+        lda enemydir,x
+        cmp #3
+        bcs !more+
+        //UP
+        lda enemyy,x 
+        tay 
+        dey 
+        lda enemyx,x 
+        tax 
+        jsr CheckCollider_XY
+        cmp #1
+        bcs !+
+        jmp endNMECollision
+        !:
+        lda #6
+        ldx enemyposloop
+        sta enemydir,x
+        jmp endNMECollision
+        !more:
+        cmp #5
+        bcs !more+
+        //right
+        lda enemyy,x 
+        tay 
+        dey 
+        lda enemyx,x 
+        tax 
+        jsr CheckCollider_XY
+        cmp #1
+        bcs !+
+        jmp endNMECollision
+        !:
+        lda #8
+        ldx enemyposloop
+        sta enemydir,x
+        !more:
+endNMECollision:
+        inc enemyposloop
+        lda enemyposloop
+        cmp #4
+        bcs !+
+        jmp nmeColLoop
+        !:
+        lda #0
+        sta enemyposloop
+        */
+    //rts
+
+enemychar: .byte $00,$00,$00,$00
+
+FlashPow:
+
+    rts
+
+/////////////////
+// x position
+// y position
+// returns A = 0 if empty, 1 if blocked
+CheckEnemyCollider_XY:
+        cpx #1
+        bcs !+
+        lda #1
+        rts 
+        !:
+        cpx #22
+        bcc !+
+        lda #1
+        rts 
+        !:
+        cpy #1
+        bcs !+
+        lda #1
+        rts 
+        !:
+        cpy #21
+        bcc !+
+        lda #1
+        rts 
+        !:
+
+        stx $fd
+        sty $fe
+
+        lda #0
+        sta $fb
+        lda #$1e
+        sta $fc //$fb,$fc = $1e00
+        lda #0
+        ldy $fe //ypos
+    !:  beq !yzero+
+        clc
+        adc #22 //move to row2
+        bcc !noinc+
+        inc $fc 
+        !noinc:
+        dey
+        bpl !-
+        !yzero:
+        ldx $fd //x
+        stx $fb //x offset
+        clc
+        adc $fb
+        bcc !noinc+
+        inc $fc
+        !noinc:
+        sta $fb
+        //draw:
+        ldy #0
+        lda ($fb),y
+        cmp #83
+        bcc !+
+        cmp #92+1
+        bcs !+
+        //
+        lda #1
+        rts
+    !:  //between 77-80 = edges
+        cmp #77
+        bcc !+
+        cmp #81
+        bcs !+
+        lda #1
+        rts
+    !:  
+        cmp #90
+        bcc !+
+        cmp #92+1
+        bcs !+
+        lda #1
+        rts 
+        !:
+        
+        lda #0
+        rts
+
+codeEnd:
+.print "Code block 2 size: " + (codeEnd - dataend)
+.print "---"
+.print "Total size: " + (codeEnd - block1start)
+.print "Bytes remaining: " + (7679 - codeEnd)

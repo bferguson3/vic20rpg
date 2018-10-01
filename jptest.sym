@@ -1,0 +1,5 @@
+.label init=$120e
+.label JPText=$1247
+.label PrintJPText=$1229
+.label basicEnd=$120c
+.label JPText2=$1257
