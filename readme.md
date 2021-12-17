@@ -12,6 +12,7 @@ To create the installer BAS file:
 <br>
 To run:<br>
 Create a wrapper BASIC program such as:<br>
+
 ```
 10 for a=7552to7566
 20 read b:poke a,b:next a
@@ -20,4 +21,4 @@ Create a wrapper BASIC program such as:<br>
 50 sys7552
 60 goto 40
 ```
-In this example, SYS7552 will wait for vblank and increment the bg color register.
+In this example, SYS7552 will wait for vblank and return.
