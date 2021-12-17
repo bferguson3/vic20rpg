@@ -7,7 +7,7 @@ NTSC_SCR_Y=118
 	_vwait:
 		lda RASTER_REG 
 		cmp #NTSC_SCR_Y 
-		bcc _vwait			; wait for raster line 122
+		bcc _vwait			; wait for raster line 118
 	VBLANK:
 		rts 				; back to basic 
 
